@@ -1,0 +1,442 @@
+---
+title: "Final:Introduccion al lenguaje R. Modelos lineales y fundamentos de programación"
+author: "Antonella Yael Diaz Casas"
+date: "2024-09-25"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Información de los datos
+
+Se quiere analizar las diferencias en el número de granos de polen
+que cargan los artrópodos que consumen las gotas de polinización, 
+de dos especies de Ephedra (E.multiflora y E.breana),estos artropodos pertenecen
+a distintos grupos taxonómicos.
+La abundancia de granos de polen sobre los insectos es la variable dependiente,
+mientras que las especies de Ephedra (E. multiflora y E. breana) y los grupos
+taxonómicos de insectos fueron considerados como factores fijos.
+
+Comenzamos cargando los paquetes necesarios 
+
+```{r, eval=FALSE, echo=TRUE, cache=TRUE}
+library(lattice)
+library(performance)
+library(car)
+library(ggplot2)
+library(fitdistrplus)
+library(MASS)
+library(dplyr)
+```
+
+
+Importamos el set de datos
+
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+tabla<- read.table ("polen.csv", header=T, sep=",", dec=".", stringsAsFactors = TRUE)
+```
+
+
+Usamos la función na.omit para eliminar NA (dato ausente)
+
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+tabla<- na.omit(tabla)
+```
+
+
+Vemos la estructura de los datos
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+summary(tabla)
+```
+
+Me indica la cantidad de observaciones para las esepcies
+de Ephedra y lo importante de aqui es que ya el 1st Qu.:  0.00 nos indica que
+por lo menos el 25% de los insectos tiene 0 granos de polen y otro dato interesante 
+es que el maximo numero de granos de polen sobre insecto es de 311
+
+Me aseguro de las variables se cargaron como factor
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+str(tabla)
+```
+
+
+Inspección de datos1: gráfico tipo Cleveland
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+plot(tabla$granos)
+```
+
+
+La mayoria de los datos se concentran en la parte inferior, lo que indica que
+muchos insectos tienen poco o ningun grano de polen
+hay algunos valores atípicos, unos pocos insectos cargaron cantidades de polen 
+superiores a 100, incluso 300 granos de polen
+
+
+
+Ordenando los datos de menor a mayor 
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+plot(sort(tabla$granos))
+```
+
+Se puede observar que hay unos pocos insectos que cargaban una gran cantidad 
+de granos (outliers) y muchos que no caragaban granos de polen.
+
+Inspección de datos 2: gráfico bivariado
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+plot(tabla$especie,tabla$granos)
+
+```
+
+E.multiflora presenta mayor cantidad de valores extremos (outliers) que E.breana.
+En ambos casos la mayoria de los insectos tienen pocos granos de polen pero hay
+algunos que presentan cantidades significativamente mayores.
+
+Grafico boxplot mejorado
+
+
+```{r fig-ejemplo,fig.cap="Esta es una figura de ejemplo." ,eval=TRUE, echo=FALSE, cache=TRUE}
+library(ggplot2)
+
+ggplot(tabla,aes(x=especie,y=granos))+theme_bw()+geom_jitter(alpha=0.9,size=1,aes(color=especie),position=position_jitter(width=0.2))+geom_boxplot(aes(color=especie),alpha=0.1)+theme(legend.position="top")+ylab("granos")+theme(legend.text=element_text(size=12),legend.title=element_text(size=12,face="bold"))
+
+
+```
+
+Exploramos la distribucion de los datos por especie comparando con la media de 
+granos,para ello hacemos una subdivision de los datos en breana y multiflora
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+breana<-subset(tabla, especie=="E.breana")
+multiflora<-subset(tabla, especie=="E.multiflora")
+
+```
+
+Exploramos la distribucion de los datos por especie comparando con la media de granos
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+plot(sort(breana$granos), type = "p") 
+m.nec1 <- mean(breana$granos, na.rm = TRUE)
+abline(h = m.nec1) 
+
+plot(sort(multiflora$granos), type = "p")
+m.nec2 <- mean(multiflora$granos, na.rm = TRUE)
+abline(h = m.nec2) 
+
+
+```
+
+Exploramos la cantidad de granos de polen por grupo de insectos
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+plot(breana$grupo,breana$granos)
+
+```
+
+Se observa que los outliers en E.breana se presentan en el grupo Flies.
+
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+plot(multiflora$grupo,multiflora$granos)
+
+```
+
+Miesntras que en E.multiflora la mayor cantidad de outliers se presenta en el grupo 
+Wasps seguido por el grupo Flies.
+
+##Modelo lineal (regresión)##
+
+Realizo el primer modelo teniendo en cuenta solo 
+la variable independinte especie, utilizando la funcion "lm".
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+fit<-lm(granos~especie,data = tabla)
+```
+
+Realizo un ANOVA y un Summary del modelo
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+anova(fit)
+```
+El ANOVA sugiere que hay una diferencia significativa en la cantidad de granos 
+de polen entre las dos especies de Ephedra.
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+summary(fit)
+```
+
+El valor t y p indican que la diferencia en la cantidad de granos de polen 
+en las dos especies es estadisticamente significativa.
+
+El valor bajo del R² 0,05689 nos indica que la variable especie solo explica 
+una pequeña parte de la variabilidad de los datos, lo que sugiere que hay
+involuncrados otros factores.
+
+Diagnósticos gráficos 1 para modelo de regresion lineal
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+layout(matrix(1:4,2,2))
+plot(fit)
+layout(1)
+
+```
+
+
+En cuanto a la Linealidad los residuos no muestran patrones claros pero si 
+hay algunos puntos extremos.
+En el grafico Scale-Location, se observa nuevamente un agrupamiento a la derecha 
+lo que sugiere que para algunos puntos la varianza no es constante.
+En el grafico Normal Q-Q algunos puntos en la cola derecha indican una desviacion
+de la normalidad.
+En el grafico Residuals vs Leverage hay un punto con una alta dictancia de Cook,
+al borde del garfico que sugiere ser revisado
+
+Diagnósticos gráficos 2 para modelo de regresion lineal
+Graficas para normalidad, linealidad, poder predictor y homogeneidad.
+
+```{r, eval=TRUE, echo=FALSE, cache=TRUE}
+library(performance)
+
+check_model(fit)
+
+```
+
+
+En el primer grafico podemos ver que los datos observados con los datos predichos
+por el modelo no ajustan bien.
+En cuanto a la linealidad se puede observar algunas desviaciones. 
+En el tercer grafico pordemos observar un aumento en la variabilidad de los residuos
+en los valores altos, la linea no es horizontal lo que sugiere que la varianza 
+de los residuos no es contante.
+El grafico Influential Observations sugiere que hay datos influyentes que 
+podrian estar afectando el modelo.
+El ultiimo grafico indica por los extremos que los residuos no son normales.
+
+Verificacion de los supuestos 
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+library(performance)
+library("see")
+
+check_normality(fit)
+```
+Indica que los residuos del modelo no siguen una distribucion normal , lo que puede
+afectar la validez de los intervalos de confianza y las pruebas de hipotesis.
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+library(performance)
+
+check_homogeneity(fit, method = "auto")
+```
+Esta advertencia nos dice que el modelo no cumple con el supuesto de 
+homogeneidad de las varianzas
+
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+model_performance(fit)
+```
+Tanto el AIC como el BIC son altos lo que sugiere q el modelo no ajusta bien 
+el R2 es muy bajo lo que indica q el modelo no explica demasiado la variabilidad 
+de la variable dependiente.
+
+Pruebas para verificar los supuestos del modelo
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+shapiro.test(residuals(fit))
+
+```
+
+Los residuos no siguen una distribucion normal.
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+bartlett.test(residuals(fit)~tabla$especie)
+
+
+```
+
+Las varianzas no son iguales entre las especies.
+
+
+Vamos a seleccionar un modelo basado en significancia, para despues poner a prueba 
+el mejor.
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+fit1 <- lm(granos ~ especie * grupo, data = tabla)
+fit2 <- lm(granos ~ especie + grupo, data = tabla)
+fit3 <- lm(granos ~ especie, data =tabla)
+fit4 <- lm(granos ~ grupo, data =tabla)
+fit5 <- lm(granos ~ 1, data =tabla)
+
+```
+
+Hacemos un Anova para compararar
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+anova(fit1, fit2, fit3, fit4, fit5)
+
+```
+
+Resultados importantes 
+No hay diferencia significativa entre el modelo 1 y el modelo 2 , lo que
+sugiere que la interaccion entre especies y grupo no aporta una mejora
+significativa al modelo.
+Las diferencias significativas en los modelos 3 y 4 indican que los factores 
+especie y grupo son importantes, considerarlos mejora significativamente 
+el ajuste del modelo.
+
+Criterios
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+compare_performance(fit1, fit2, fit3, fit4, fit5)
+```
+El modelo con el AIC mas bajo es el 1 aun asi sigue siendo un numero alto, 
+segun el BIC el modelo que mejor ajusta es el 4, segun el R2 sugiere que el 
+modelo que mejor explica la variabilidad es el 1 y sugun el RMSE el modelo 1
+es el que tiene un menor error en las predicciones comparado con otros modelos.
+
+Diagnos ticos del fit 1
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+layout(matrix(1:4, 2, 2))
+plot(fit1)
+layout(1)
+```
+
+Segun los graficos los residuos no tienen una distribucion normal y no hay 
+homogeneidad de las varianzas, el modelo no cumple con los supuestos.
+
+##Distribucion poisson y binomial negativa
+
+En lo que concierne la funcion de distribucion de la probabilidad de la
+variable respuesta vamos a comparar la diatribucion 
+poisson y binomial negativa para ver si encuntro un modelo que ajuste mejor 
+ya que los datos poseen una gran cantidad de ceros.
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+table(tabla$granos==0)/nrow(tabla)
+```
+34% de los datos son ceros
+
+
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+library(fitdistrplus)
+fit.poisson=fitdist(tabla$granos,"pois")
+fit.negbin=fitdist(tabla$granos,"nbinom")
+par(mfrow=c(1,2),mar=c(4,4,2,2))
+cdfcomp(list(fit.poisson,fit.negbin))
+qqcomp(list(fit.poisson,fit.negbin))
+par(mfrow=c(1,1))
+```
+
+En ambos graficos observamos que la distribucion binomial negativa ajusta mejor.
+
+
+Comprar AIC de las dos distribuciones
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+gofstat(list(fit.poisson,fit.negbin))$aic
+```
+En este caso, el modelo binomial negativo tiene un AIC mucho más bajo que 
+el modelo Poisson, lo que sugiere que ajusta mejor los datos.
+
+##Modelo con distribucion binomial negativa##
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+m.nb=glm.nb(granos~especie*grupo,data=tabla)
+```
+
+Hacemos un anova
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+anova(m.nb,test="Chi")
+```
+Este analis nos muestra que tanto especie , como grupo y la interaccion entre ellos
+mejora significativamente el modelo,conefectos importantes en la reduccion de la
+desviacion. 
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+summary(m.nb)
+```
+El AIC: 673.68 es el mas bajo hasta ahora de todos los modelos que se probaron
+tambien podemos concluir que no hay diferencia significativa en la cantidad de 
+de polen entre E.breana y E.multiflora.
+Si hay diferencia significativa en el grupo waps de E.multiflora con respecto a
+la cantidad de granos de polen. 
+El modelo con distribucion binomial negativa, parece ser el adecuado por la 
+sobre dispercion de los datos.
+
+Versión alternativa del mismo modelo
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+m.nb1=glm.nb(granos~especie*grupo-1-especie,data=tabla)
+```
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+summary(m.nb1)
+```
+
+Ambos modelos son útiles para explicar la relación entre las variables,
+pero el modelo alternativo sin el efecto principal de especie destaca más 
+la importancia del grupo, particularmente el fuerte efecto de grupo Flies.
+
+Revisando el modelo
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+check_model(m.nb1)
+```
+
+El gráfico de ajuste predictivo muestra que los puntos observados y predichos 
+están bastante alineados, el modelo ajusta bastante bien.
+
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+model_performance(m.nb1)
+```
+En general, el modelo muestra un excelente ajuste según Nagelkerke's R² (0.997),
+lo que sugiere que explica casi toda la variabilidad en los datos. Sin embargo,
+las métricas de dispersión residual como el RMSE y el Score_spherical sugieren 
+que aún puede haber algunos errores en las predicciones individuales, aunque no 
+son significativos en el contexto general del modelo. La comparación entre AIC 
+y BIC indica que el modelo es razonablemente parsimonioso, pero el BIC sugiere 
+ que la complejidad del modelo sigue siendo una consideración importante.
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+check_residuals(m.nb1)
+```
+Modelo Adecuado: La uniformidad de los residuos sugiere que el modelo se 
+ajusta bien a los datos, lo que es un buen indicio de que las suposiciones
+del modelo son razonables.
+
+##Graficos de barra##
+
+```{r, eval=TRUE, echo=TRUE, cache=TRUE}
+p <- ggplot(data = tabla, aes(x = especie, y = granos, fill = grupo)) +
+  geom_bar(stat = "identity", position = "dodge", color = "black") +
+  theme_minimal() +
+  labs(x = "Especie", y = "Número de granos", fill = "Grupo") +
+  scale_fill_manual(values = c("skyblue", "tomato", "green", "blue")) +  # Ajustar colores
+  theme(legend.position = "bottom")  # Mover la leyenda abajo
+
+# Mostrar el gráfico
+print(p)
+```
+
+
+
+
+
+
+
+
+
+
+
+
